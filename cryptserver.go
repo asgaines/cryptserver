@@ -14,17 +14,36 @@ func main() {
 	// Load the variables with values from command line
 	flag.Parse()
 
-	interrupt := make(chan os.Signal)
+	// Channel with which to issue shutdown command from HTTP handler
 	shutdown := make(chan bool)
+
+	// Channel blocking program exit until ListenAndServe message logged
 	complete := make(chan bool)
+
+	// Capture SIGINT (<Ctrl-C> or `kill -2` signals)
+	interrupt := make(chan os.Signal)
 	signal.Notify(interrupt, os.Interrupt)
 
 	server := createServer(port, shutdown)
 
-	go listenShutdown(&server, interrupt, shutdown, complete)
+	go func() {
+		// ListenAndServe always returns non-nil error
+		log.Println(server.ListenAndServe())
+		// Logging complete: unblock program exit
+		complete <- true
+	}()
 
-	// ListenAndServe always returns non-nil error
-	log.Println(server.ListenAndServe())
+	// Block until shutdown request issued
+	select {
+	case <- interrupt:
+		// Shutdown issued through SIGINT
+		gracefulShutdown(&server)
+	case <- shutdown:
+		// Shutdown issued from HTTP handler
+		gracefulShutdown(&server)
+	}
+
+	// Block until ListenAndServe message logged
 	<-complete
 }
 
