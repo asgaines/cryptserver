@@ -9,19 +9,24 @@ import (
 	"strings"
 )
 
-type passEncoding struct {
+var passwordEncodings = []struct {
 	password string
 	passHash string
-}
-
-var passwordEncodings = []passEncoding{
+}{
+	// {"password", "correct-hash-of-password"}
 	{"angryMonkey", "ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="},
 	{"blowfish1234", "CG9ZxAdtMgJfBbBjtTmznVrAH/bIKMYG9AOvLx/+P/4kIaCkXzhSi7K6TYfEnHCB/cicK2A6BBfZL6q48V25SA=="},
 	{"a87&1hkA!l*Q12n6i2&Q", "RRBeSqawrv0y1LrVZb13RhHneaHkSvzAvacPttI+j+SQEcri19wr+fD2qOqzcw7C404jaYXSne0sg39/eO7eaA=="},
 }
 
 func TestEncodeValidPasswords(t *testing.T) {
-	passwordEncodings := append(passwordEncodings, passEncoding{"", "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="})
+	passwordEncodings := append(
+		passwordEncodings,
+		struct {
+			password string
+			passHash string
+		}{"", "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="})
+
 	for _, c := range passwordEncodings {
 		result := encode(c.password)
 		if result != c.passHash {
