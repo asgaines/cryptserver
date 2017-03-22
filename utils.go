@@ -13,7 +13,7 @@ func encode(password string) string {
 	return base64.StdEncoding.EncodeToString(hasher.Sum(nil))
 }
 
-func loadPassHash(filename string) map[string]bool {
+func loadPassHashes(filename string) map[string]bool {
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
