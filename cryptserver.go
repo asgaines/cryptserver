@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"time"
 	"net"
+	"github.com/asgaines/cryptserver/utils"
+	"github.com/asgaines/cryptserver/server"
 )
 
 func main() {
@@ -31,9 +33,9 @@ func main() {
 
 	// Load the map of accepted password hashes enumerated in
 	// the path passed to the function
-	passHashes := loadPassHashes("./etc/shadow")
+	passHashes := utils.LoadPassHashes("./etc/shadow")
 
-	server := createServer(port, delay, shutdown, passHashes)
+	httpServer := server.Create(port, delay, shutdown, passHashes)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
 	if err != nil {
@@ -42,7 +44,7 @@ func main() {
 
 	go func() {
 		// ListenAndServe always returns non-nil error
-		log.Println(server.Serve(listener))
+		log.Println(httpServer.Serve(listener))
 		// Logging complete: unblock program exit
 		complete <- true
 	}()
@@ -51,10 +53,10 @@ func main() {
 	select {
 	case <- interrupt:
 		// Shutdown issued through SIGINT
-		gracefulShutdown(&server, delay)
+		server.GracefulShutdown(&httpServer, delay)
 	case <- shutdown:
 		// Shutdown issued from HTTP handler
-		gracefulShutdown(&server, delay)
+		server.GracefulShutdown(&httpServer, delay)
 	}
 
 	// Block until http.Serve message logged

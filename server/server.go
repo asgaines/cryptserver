@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func createServer(port int, delay time.Duration, shutdown chan bool, passHashes map[string]bool) http.Server {
+func Create(port int, delay time.Duration, shutdown chan bool, passHashes map[string]bool) http.Server {
 	mux := http.NewServeMux()
 
 	// Create handlers from handle functions
@@ -37,7 +37,7 @@ func createServer(port int, delay time.Duration, shutdown chan bool, passHashes 
 	}
 }
 
-func gracefulShutdown(server *http.Server, delay time.Duration) {
+func GracefulShutdown(server *http.Server, delay time.Duration) {
 	// Cap the shutdown timeout, the amount of time allowed
 	// for a request to be handled gracefully
 	ctx, _ := context.WithTimeout(context.Background(), delay * 3)

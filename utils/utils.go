@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"os"
@@ -7,13 +7,13 @@ import (
 	"bufio"
 )
 
-func encode(password string) string {
+func Encode(password string) string {
 	hasher := sha512.New()
 	hasher.Write([]byte(password))
 	return base64.StdEncoding.EncodeToString(hasher.Sum(nil))
 }
 
-func loadPassHashes(filename string) map[string]bool {
+func LoadPassHashes(filename string) map[string]bool {
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)

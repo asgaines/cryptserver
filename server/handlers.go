@@ -1,10 +1,11 @@
-package main
+package server
 
 import (
 	"fmt"
 	"time"
 	"net/http"
 	"log"
+	"github.com/asgaines/cryptserver/utils"
 )
 
 func handleCrypt(w http.ResponseWriter, req *http.Request) {
@@ -12,7 +13,7 @@ func handleCrypt(w http.ResponseWriter, req *http.Request) {
 	// Guard against extraneous paths
 	if req.URL.Path == "/" {
 		if unhashedPass := req.PostFormValue("password"); unhashedPass != "" {
-			if _, err := fmt.Fprintf(w, "%v\n", encode(unhashedPass)); err != nil {
+			if _, err := fmt.Fprintf(w, "%v\n", utils.Encode(unhashedPass)); err != nil {
 				log.Println(err)
 			}
 		} else {
@@ -39,7 +40,7 @@ func handleShutdown(w http.ResponseWriter, req *http.Request) {
 		log.Fatal("Password hashes not successfully passed into context")
 	}
 
-	if _, ok := passHashes.(map[string]bool)[encode(req.PostFormValue("password"))]; ok {
+	if _, ok := passHashes.(map[string]bool)[utils.Encode(req.PostFormValue("password"))]; ok {
 		// User provided password which hashed to an acceptable value
 		// Send the shutdown signal through channel
 		if shutdown := req.Context().Value("signalChan"); shutdown != nil {
