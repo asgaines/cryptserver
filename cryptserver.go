@@ -14,10 +14,10 @@ func main() {
 	// Load the variables with values from command line
 	flag.Parse()
 
-	// Channel with which to issue shutdown command from HTTP handler
+	// Channel used to issue shutdown command from HTTP handler
 	shutdown := make(chan bool)
 
-	// Channel blocking program exit until ListenAndServe message logged
+	// Channel to block program exit until http.Serve message logged
 	complete := make(chan bool)
 
 	// Capture SIGINT (<Ctrl-C> or `kill -2` signals)
@@ -43,7 +43,7 @@ func main() {
 		gracefulShutdown(&server)
 	}
 
-	// Block until ListenAndServe message logged
+	// Block until http.Serve message logged
 	<-complete
 }
 
