@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"log"
 	"testing"
 	"net/http"
 	"net/url"
@@ -11,6 +12,12 @@ import (
 	"strings"
 	"github.com/asgaines/cryptserver/utils"
 )
+
+
+func init() {
+	// Deactivate the logging of requests to screen
+	log.SetOutput(ioutil.Discard)
+}
 
 var passwordEncodings = []struct {
 	password string
