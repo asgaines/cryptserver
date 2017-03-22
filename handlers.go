@@ -23,7 +23,12 @@ func handleCrypt(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid path", http.StatusNotFound)  // 404
 	}
 
-	time.Sleep(5 * time.Second)
+	// Delay response to client
+	if delay := req.Context().Value("delay"); delay != nil {
+		time.Sleep(delay.(time.Duration))
+	} else {
+		log.Fatal("Delay time not successfully passed into context")
+	}
 }
 
 func handleShutdown(w http.ResponseWriter, req *http.Request) {
@@ -46,7 +51,11 @@ func handleShutdown(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid password", http.StatusUnauthorized)  // 401
 
 		// This keeps a user from brute-forcing password requests
-		time.Sleep(5 * time.Second)
+		if delay := req.Context().Value("delay"); delay != nil {
+			time.Sleep(delay.(time.Duration))
+		} else {
+			log.Fatal("Delay time not successfully passed into context")
+		}
 	}
 }
 

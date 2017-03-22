@@ -5,12 +5,16 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
+	"net"
 )
 
 func main() {
 	var port int
+	var delay time.Duration
 	// Optionally set port, default is 8080
 	flag.IntVar(&port, "port", 8080, "Port number for server connection")
+	flag.DurationVar(&delay, "delay", 5 * time.Second, "Time to delay response to client ('3s' is 3 seconds)")
 	// Load the variables with values from command line
 	flag.Parse()
 
@@ -37,10 +41,10 @@ func main() {
 	select {
 	case <- interrupt:
 		// Shutdown issued through SIGINT
-		gracefulShutdown(&server)
+		gracefulShutdown(&server, delay)
 	case <- shutdown:
 		// Shutdown issued from HTTP handler
-		gracefulShutdown(&server)
+		gracefulShutdown(&server, delay)
 	}
 
 	// Block until http.Serve message logged
