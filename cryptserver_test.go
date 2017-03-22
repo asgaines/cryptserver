@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"net"
+	"time"
 	"testing"
 	"net/http"
 	"net/url"
@@ -76,43 +80,213 @@ func TestLoadPasswordHashesFail(t *testing.T) {
 }
 
 func TestCryptValidPasswords(t *testing.T) {
-	port := 8080
+	port := 8081
 	shutdown := make(chan bool)
-	server := createServer(port, shutdown)
-	go server.ListenAndServe()
+	passHashes := loadPassHashes("./etc/shadow")
+	delay := 0 * time.Second
+
+	server := createServer(port, delay, shutdown, passHashes)
+	defer server.Close()
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		t.Error(err)
+	}
+	defer listener.Close()
+
+	go func() {
+		fmt.Println(server.Serve(listener))
+	}()
 
 	for _, c := range passwordEncodings {
 		resp, _ := http.PostForm(fmt.Sprintf("http://localhost:%d/", port), url.Values{"password": {c.password}})
+		defer resp.Body.Close()
+
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("Failed to read data")
 		}
-		defer resp.Body.Close()
 
 		result := strings.TrimSpace(string(data))
 
 		if result != c.passHash {
 			t.Errorf("Password %q returned %q, expected %q", c.password, result, c.passHash)
 		}
-
 	}
 }
 
 func TestCryptInvalidPasswords(t *testing.T) {
-	port := 8080
+	port := 8082
 	shutdown := make(chan bool)
-	server := createServer(port, shutdown)
-	go server.ListenAndServe()
+	passHashes := loadPassHashes("./etc/shadow")
+	delay := 0 * time.Second
 
-	invalidPasswords := []string{""}
-	for _, password := range invalidPasswords {
-		resp, err := http.PostForm(fmt.Sprintf("http://localhost:%d/", port), url.Values{"password": {password}})
-		if err != nil {
-			t.Errorf("Failed to read data")
-		}
-		if resp.StatusCode != 400 {
-			t.Errorf("Response code %v is not 400", resp.StatusCode)
-		}
+	server := createServer(port, delay, shutdown, passHashes)
+	defer server.Close()
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		t.Error(err)
 	}
+	defer listener.Close()
+
+	go func() {
+		fmt.Println(server.Serve(listener))
+	}()
+
+	resp, err := http.PostForm(fmt.Sprintf("http://localhost:%d/", port), url.Values{"password": {""}})
+	if err != nil {
+		t.Error(err)
+		fmt.Println(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Errorf("Response code %v is not 400", resp.StatusCode)
+	}
+}
+
+func TestShutdownValidPassword(t *testing.T) {
+	port := 8083
+	shutdown := make(chan bool)
+	end := make(chan bool)
+	passHashes := loadPassHashes("./etc/shadow")
+	delay := 1 * time.Second
+
+	server := createServer(port, delay, shutdown, passHashes)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		t.Error(err)
+	}
+	defer listener.Close()
+
+	go func() {
+		fmt.Println(server.Serve(listener))
+	}()
+
+	password := "angryMonkey"
+	var resp *http.Response
+
+	go func() {
+		resp, _ = http.PostForm(fmt.Sprintf("http://localhost:%d/shutdown", port), url.Values{"password": {password}})
+		defer resp.Body.Close()
+		end <- true
+	}()
+
+	// Channel receives from shutdown handler
+	<-shutdown
+	<-end
+	gracefulShutdown(&server, delay)
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Status code was %v when expecting 200", resp.StatusCode)
+	}
+}
+
+func TestShutdownIsGraceful(t *testing.T) {
+	port := 8084
+	shutdown := make(chan bool)
+	passHashes := loadPassHashes("./etc/shadow")
+	delay := 200 * time.Millisecond
+
+	server := createServer(port, delay, shutdown, passHashes)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		t.Error(err)
+	}
+	defer listener.Close()
+
+	go func() {
+		fmt.Println(server.Serve(listener))
+	}()
+
+	validPassword := "angryMonkey"
+
+	var resp *http.Response
+
+	go func() {
+		resp, _ = http.PostForm(fmt.Sprintf("http://localhost:%d/", port), url.Values{"password": {"password123"}})
+		defer resp.Body.Close()
+	}()
+
+	// Wait halfway through request response time, then issue a shutdown request
+	time.Sleep(delay / 2)
+
+	go func() {
+		resp, _ := http.PostForm(fmt.Sprintf("http://localhost:%d/shutdown", port), url.Values{"password": {validPassword}})
+		defer resp.Body.Close()
+	}()
+
+	<-shutdown // Receives from server shutdown handler
+	gracefulShutdown(&server, delay)
+
+	if resp.StatusCode != 200 {
+		t.Error("Server was shutdown before processing request completed")
+	}
+}
+
+func TestSIGINTHandledGracefully(t *testing.T) {
+	var status int
+	delay := 100 * time.Millisecond
+	port := 8080
+
+	cmd := exec.Command("./cryptserver",
+		"--delay", fmt.Sprintf("%v", delay),
+		"--port", fmt.Sprintf("%v", port))
+
+	if err := cmd.Start(); err != nil {
+		t.Error(err)
+	}
+
+	// Give the server a little time to spool up
+	time.Sleep(100 * time.Millisecond)
+
+	go func() {
+		resp, err := http.PostForm(fmt.Sprintf("http://localhost:%v", port), url.Values{"password": {"encrypt_this"}})
+		if err != nil {
+			t.Error(err)
+		}
+		status = resp.StatusCode
+	}()
+
+	// Issue SIGINT halfway through request response time
+	time.Sleep(delay / 2)
+	cmd.Process.Signal(os.Interrupt)
+
+	cmd.Wait()
+
+	if status != 200 {
+		t.Error("Received status %d, expected 200", status)
+	}
+}
+
+func TestSIGTERMNotHandledGracefully(t *testing.T) {
+	delay := 100 * time.Millisecond
+	port := 8080
+
+	cmd := exec.Command("./cryptserver",
+		"--delay", fmt.Sprintf("%v", delay),
+		"--port", fmt.Sprintf("%v", port))
+
+	if err := cmd.Start(); err != nil {
+		t.Error(err)
+	}
+
+	// Give the server a little time to spool up
+	time.Sleep(100 * time.Millisecond)
+
+	go func() {
+		resp, _ := http.PostForm(fmt.Sprintf("http://localhost:%v", port), url.Values{"password": {"encrypt_this"}})
+		if resp != nil {
+			t.Error("Response did not fail")
+		}
+	}()
+
+	// Issue SIGINT halfway through request response time
+	time.Sleep(delay / 2)
+	cmd.Process.Signal(os.Kill)
+
+	cmd.Wait()
 }
 
