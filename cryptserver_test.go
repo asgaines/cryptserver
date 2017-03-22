@@ -35,11 +35,11 @@ func TestEncodeValidPasswords(t *testing.T) {
 	}
 }
 
-func TestLoadPasswordHashesSuccess(t *testing.T) {
+func TestLoadPasswordHashes(t *testing.T) {
 	testFilename := "./test/etc/shadow"
-	hashed_passwords := loadPassHash(testFilename)
+	passHashes := loadPassHashes(testFilename)
 
-	success_cases := []struct {
+	successCases := []struct {
 		passHash string
 	}{
 		{"ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="},
@@ -48,8 +48,8 @@ func TestLoadPasswordHashesSuccess(t *testing.T) {
 	}
 
 	// Test all password hashes in file are recognized
-	for _, c := range success_cases {
-		if _, ok := hashed_passwords[c.passHash]; !ok {
+	for _, c := range successCases {
+		if _, ok := passHashes[c.passHash]; !ok {
 			t.Errorf("%q should be present in hash map", c.passHash)
 		}
 	}
@@ -57,9 +57,9 @@ func TestLoadPasswordHashesSuccess(t *testing.T) {
 
 func TestLoadPasswordHashesFail(t *testing.T) {
 	testFilename := "./test/etc/shadow"
-	hashed_passwords := loadPassHash(testFilename)
+	passHashes := loadPassHashes(testFilename)
 
-	fail_cases := []struct {
+	failCases := []struct {
 		passHash string
 	}{
 		{"XEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFX6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7X=="},
@@ -68,8 +68,8 @@ func TestLoadPasswordHashesFail(t *testing.T) {
 	}
 
 	// Test password hashes not in file are not recognized
-	for _, c := range fail_cases {
-		if _, ok := hashed_passwords[c.passHash]; ok {
+	for _, c := range failCases {
+		if _, ok := passHashes[c.passHash]; ok {
 			t.Errorf("%q should not be present in hash map", c.passHash)
 		}
 	}
