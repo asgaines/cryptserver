@@ -7,11 +7,29 @@ import (
 	"time"
 )
 
-func createServer(port int, shutdown chan bool) http.Server {
+func createServer(port int, delay time.Duration, shutdown chan bool, passHashes map[string]bool) http.Server {
 	mux := http.NewServeMux()
 
-	mux.Handle("/shutdown", addContext(http.HandlerFunc(handleShutdown), shutdown))
-	mux.HandleFunc("/", handleCrypt)
+	// Create handlers from handle functions
+	cryptHandleFunc := http.HandlerFunc(handleCrypt)
+	shutdownHandleFunc := http.HandlerFunc(handleShutdown)
+
+	// Inject time to delay into handler context
+	cryptHandler := addDelayContext(cryptHandleFunc, delay)
+	shutdownHandler := addDelayContext(shutdownHandleFunc, delay)
+
+	// Inject shutdown channel
+	shutdownHandler = addShutdownContext(shutdownHandler, shutdown)
+	// Inject password hashes map loaded from file
+	shutdownHandler = addPassHashesContext(shutdownHandler, passHashes)
+
+	// Add logging to request handling
+	cryptHandler = addLogging(cryptHandler)
+	shutdownHandler = addLogging(shutdownHandler)
+
+	// Create request routing
+	mux.Handle("/shutdown", shutdownHandler)
+	mux.Handle("/", cryptHandler)
 
 	return http.Server{
 		Handler: mux,
