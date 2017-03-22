@@ -29,11 +29,20 @@ func main() {
 	interrupt := make(chan os.Signal)
 	signal.Notify(interrupt, os.Interrupt)
 
-	server := createServer(port, shutdown)
+	// Load the map of accepted password hashes enumerated in
+	// the path passed to the function
+	passHashes := loadPassHashes("./etc/shadow")
+
+	server := createServer(port, delay, shutdown, passHashes)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go func() {
 		// ListenAndServe always returns non-nil error
-		log.Println(server.ListenAndServe())
+		log.Println(server.Serve(listener))
 		// Logging complete: unblock program exit
 		complete <- true
 	}()
